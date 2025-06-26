@@ -7,27 +7,18 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2 import service_account
 import json
 
-
-
-
 # Konfigurasi kredensial dan folder Drive
 scope = ['https://www.googleapis.com/auth/drive']
 service_account_file = 'service_account.json'
 parent_folder_id = "1WV7Xby3cEd2gHoRJNEzcDieSO0WUlMRB"
 
-# Autentikasi Google Drive dari secrets
+# Autentikasi Google Drive
 def authenticate():
     service_account_info = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT"])
-    creds = service_account.Credentials.from_service_account_info(service_account_info, scopes=["https://www.googleapis.com/auth/drive"])
+    creds = service_account.Credentials.from_service_account_info(
+        service_account_info, scopes=["https://www.googleapis.com/auth/drive"])
     service = build('drive', 'v3', credentials=creds)
     return service
-
-## Fungsi autentikasi Google Drive
-# def authenticate():
-#     creds = service_account.Credentials.from_service_account_file(
-#         service_account_file, scopes=scope)
-#     service = build('drive', 'v3', credentials=creds)
-#     return service
 
 # Fungsi upload ke Google Drive
 def upload_to_drive(file_path, filename, parent_folder_id):
@@ -63,17 +54,17 @@ with st.sidebar:
 if selected == "Form":
     st.title("📦 Form Input Reservasi Material")
 
-    # ...
     with st.form("form_reservasi"):
         nama_file = st.text_input("📝 Nama File (tanpa .xlsx)")
         reservasi = st.text_input("Masukkan No. Reservasi")
+        mac_address = st.text_input("Masukkan MAC Address")  # ✅ Tambahan MAC Address
         lokasi = st.text_input("Masukkan Lokasi")
         material_input = st.text_area("📦 Masukkan Daftar Material (1 baris 1 material)")
         quantity_input = st.text_area("🔢 Masukkan Jumlah Material (1 baris 1 jumlah, sesuai urutan material)")
         submit = st.form_submit_button("Simpan")
 
         if submit:
-            if not nama_file or not reservasi or not lokasi or not material_input.strip() or not quantity_input.strip():
+            if not nama_file or not reservasi or not mac_address or not lokasi or not material_input.strip() or not quantity_input.strip():
                 st.warning("❗ Semua kolom wajib diisi!")
             else:
                 list_material = material_input.strip().splitlines()
@@ -96,6 +87,7 @@ if selected == "Form":
                     else:
                         df_baru = pd.DataFrame({
                             "Reservasi": [reservasi] * len(list_material),
+                            "MAC Address": [mac_address] * len(list_material),
                             "Lokasi": [lokasi] * len(list_material),
                             "Material": list_material,
                             "Quantity": quantity_numbers
@@ -109,7 +101,6 @@ if selected == "Form":
                         except Exception as e:
                             st.error(f"❌ Gagal upload ke Google Drive: {e}")
 
-
 # ==========================
 # HALAMAN LIHAT DATA
 # ==========================
@@ -122,6 +113,22 @@ elif selected == "Lihat Data":
         selected_file = st.selectbox("Pilih file untuk ditampilkan:", excel_files)
         file_path = os.path.join(folder_path, selected_file)
 
+        # ✅ Ubah nama file
+        new_filename = st.text_input("Ubah Nama File (tanpa .xlsx)", value=selected_file.replace(".xlsx", ""))
+        if st.button("✏️ Ubah Nama File"):
+            new_filename_sanitized = new_filename.strip().replace(" ", "_") + ".xlsx"
+            new_file_path = os.path.join(folder_path, new_filename_sanitized)
+
+            if new_filename_sanitized == selected_file:
+                st.warning("⚠️ Nama file tidak berubah.")
+            elif os.path.exists(new_file_path):
+                st.error("❌ Nama file sudah ada. Gunakan nama lain.")
+            else:
+                os.rename(file_path, new_file_path)
+                st.success(f"✅ Nama file berhasil diubah menjadi: {new_filename_sanitized}")
+                st.rerun()
+
+        # Tampilkan dan edit data
         df_tampil = pd.read_excel(file_path)
         edited_df = st.data_editor(df_tampil, use_container_width=True, num_rows="dynamic")
 
@@ -130,7 +137,7 @@ elif selected == "Lihat Data":
             st.success("✅ Perubahan berhasil disimpan!")
 
         if st.button("🗑️ Hapus Isi File Ini"):
-            df_kosong = pd.DataFrame(columns=["Reservasi", "Lokasi", "Material"])
+            df_kosong = pd.DataFrame(columns=["Reservasi", "MAC Address", "Lokasi", "Material", "Quantity"])
             df_kosong.to_excel(file_path, index=False)
             st.success("✅ Data dalam file ini berhasil dihapus!")
     else:
