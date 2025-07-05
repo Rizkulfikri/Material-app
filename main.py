@@ -16,7 +16,8 @@ parent_folder_id = "1WV7Xby3cEd2gHoRJNEzcDieSO0WUlMRB"
 def authenticate():
     service_account_info = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT"])
     creds = service_account.Credentials.from_service_account_info(
-        service_account_info, scopes=["https://www.googleapis.com/auth/drive"])
+        service_account_info, scopes=["https://www.googleapis.com/auth/drive"]
+    )
     service = build('drive', 'v3', credentials=creds)
     return service
 
@@ -57,21 +58,24 @@ if selected == "Form":
     with st.form("form_reservasi"):
         nama_file = st.text_input("📝 Nama File (tanpa .xlsx)")
         reservasi = st.text_input("Masukkan No. Reservasi")
-        mac_address = st.text_input("Masukkan MAC Address")  # ✅ Tambahan MAC Address
         lokasi = st.text_input("Masukkan Lokasi")
-        material_input = st.text_area("📦 Masukkan Daftar Material (1 baris 1 material)")
-        quantity_input = st.text_area("🔢 Masukkan Jumlah Material (1 baris 1 jumlah, sesuai urutan material)")
+
+        kode_material_input = st.text_area("🔢 Masukkan Kode Material (1 baris 1 kode)")
+        material_input = st.text_area("📦 Masukkan Nama Material (1 baris 1 nama)")
+        quantity_input = st.text_area("📦 Masukkan Jumlah (1 baris 1 jumlah, sesuai urutan material)")
+
         submit = st.form_submit_button("Simpan")
 
         if submit:
-            if not nama_file or not reservasi or not mac_address or not lokasi or not material_input.strip() or not quantity_input.strip():
+            if not nama_file or not reservasi or not lokasi or not material_input.strip() or not quantity_input.strip() or not kode_material_input.strip():
                 st.warning("❗ Semua kolom wajib diisi!")
             else:
+                list_kode = kode_material_input.strip().splitlines()
                 list_material = material_input.strip().splitlines()
                 list_quantity = quantity_input.strip().splitlines()
 
-                if len(list_material) != len(list_quantity):
-                    st.error("❌ Jumlah baris material dan jumlah baris quantity tidak sama!")
+                if len(list_kode) != len(list_material) or len(list_material) != len(list_quantity):
+                    st.error("❌ Jumlah baris kode, material, dan quantity harus sama!")
                 else:
                     try:
                         quantity_numbers = [int(q.strip()) for q in list_quantity]
@@ -87,9 +91,9 @@ if selected == "Form":
                     else:
                         df_baru = pd.DataFrame({
                             "Reservasi": [reservasi] * len(list_material),
-                            "MAC Address": [mac_address] * len(list_material),
                             "Lokasi": [lokasi] * len(list_material),
-                            "Material": list_material,
+                            "Kode Material": list_kode,
+                            "Nama Material": list_material,
                             "Quantity": quantity_numbers
                         })
                         df_baru.to_excel(file_path, index=False)
@@ -113,7 +117,6 @@ elif selected == "Lihat Data":
         selected_file = st.selectbox("Pilih file untuk ditampilkan:", excel_files)
         file_path = os.path.join(folder_path, selected_file)
 
-        # ✅ Ubah nama file
         new_filename = st.text_input("Ubah Nama File (tanpa .xlsx)", value=selected_file.replace(".xlsx", ""))
         if st.button("✏️ Ubah Nama File"):
             new_filename_sanitized = new_filename.strip().replace(" ", "_") + ".xlsx"
@@ -128,7 +131,6 @@ elif selected == "Lihat Data":
                 st.success(f"✅ Nama file berhasil diubah menjadi: {new_filename_sanitized}")
                 st.rerun()
 
-        # Tampilkan dan edit data
         df_tampil = pd.read_excel(file_path)
         edited_df = st.data_editor(df_tampil, use_container_width=True, num_rows="dynamic")
 
@@ -137,7 +139,7 @@ elif selected == "Lihat Data":
             st.success("✅ Perubahan berhasil disimpan!")
 
         if st.button("🗑️ Hapus Isi File Ini"):
-            df_kosong = pd.DataFrame(columns=["Reservasi", "MAC Address", "Lokasi", "Material", "Quantity"])
+            df_kosong = pd.DataFrame(columns=["Reservasi", "Lokasi", "Kode Material", "Nama Material", "Quantity"])
             df_kosong.to_excel(file_path, index=False)
             st.success("✅ Data dalam file ini berhasil dihapus!")
     else:
